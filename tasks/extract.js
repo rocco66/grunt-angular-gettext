@@ -26,7 +26,7 @@ module.exports = function(grunt) {
     });
     attrRegex = mkAttrRegex(options.startDelim, options.endDelim);
     return this.files.forEach(function(file) {
-      var addString, catalog, escape, extractHtml, extractJs, failed, key, string, strings, walkJs;
+      var addString, binaryExpressionWalkJs, catalog, escape, extractHtml, extractJs, failed, key, string, strings, walkJs;
       failed = false;
       catalog = new po();
       strings = {};
@@ -91,6 +91,18 @@ module.exports = function(grunt) {
         }
         return _results;
       };
+      binaryExpressionWalkJs = function(node) {
+        var res;
+        res = "";
+        if (node.type === "Literal") {
+          res = node.value;
+        }
+        if (node.type === 'BinaryExpression' && node.operator === '+') {
+          res += binaryExpressionWalkJs(node.left);
+          res += binaryExpressionWalkJs(node.right);
+        }
+        return res;
+      };
       extractJs = function(filename) {
         var src, syntax;
         src = grunt.file.read(filename);
@@ -98,9 +110,16 @@ module.exports = function(grunt) {
           tolerant: true
         });
         return walkJs(syntax, function(node) {
-          var str, _ref, _ref1;
-          if ((node != null ? node.type : void 0) === 'CallExpression' && ((_ref = node.callee) != null ? _ref.name : void 0) === 'gettext') {
-            str = (_ref1 = node["arguments"]) != null ? _ref1[0].value : void 0;
+          var arg, str, _ref;
+          if ((node != null ? node.type : void 0) === 'CallExpression' && ((_ref = node.callee) != null ? _ref.name : void 0) === 'gettext' && (node["arguments"] != null)) {
+            arg = node["arguments"][0];
+            switch (arg.type) {
+              case 'Literal':
+                str = arg.value;
+                break;
+              case 'BinaryExpression':
+                str = binaryExpressionWalkJs(arg);
+            }
             if (str) {
               return addString(filename, str);
             }
