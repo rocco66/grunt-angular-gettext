@@ -61,13 +61,31 @@ module.exports = (grunt) ->
                 for key, obj of node
                     walkJs(obj, fn) if typeof obj == 'object'
 
+            binaryExpressionWalkJs = (node) ->
+                res = ""
+                res = node.value if node.type == "Literal"
+                if node.type == 'BinaryExpression' && node.operator == '+'
+                    res += binaryExpressionWalkJs node.left
+                    res += binaryExpressionWalkJs node.right
+                res
+
             extractJs = (filename) ->
                 src = grunt.file.read(filename)
                 syntax = esprima.parse(src, { tolerant: true })
 
                 walkJs syntax, (node) ->
-                    if node?.type == 'CallExpression' && node.callee?.name == 'gettext'
-                        str = node.arguments?[0].value
+                    if node?.type == 'CallExpression' && \
+                       node.callee?.name == 'gettext' && \
+                       node.arguments?
+                        arg = node.arguments[0]
+                        switch arg.type
+                            when 'Literal'
+                                # just simple string
+                                str = arg.value
+                            when 'BinaryExpression'
+                                # many string with concatenation
+                                # for example: "st" + "ri" + "ng"
+                                str = binaryExpressionWalkJs arg
                         addString(filename, str) if str
 
             file.src.forEach (input) ->
